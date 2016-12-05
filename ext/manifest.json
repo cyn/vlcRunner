@@ -1,0 +1,24 @@
+{
+  "name": "Vlc runner",
+  "version": "0.0.1",
+  "manifest_version": 2,
+  "description": "Extend Chrome with vlc runner",
+  "background" : {
+    "page" : "background.html",
+    "persistent" : true
+  },
+  "browser_action": {
+    "default_title": "VLC runner",
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "contextMenus",
+    "http://127.0.0.1/*"
+  ],
+  "icons": {
+    "16": "vlc512x512.png",
+    "48": "vlc512x512.png",
+    "128": "vlc512x512.png",
+    "512": "vlc512x512.png"
+  }
+}

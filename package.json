@@ -1,0 +1,11 @@
+{
+  "name": "vlc-runner",
+  "version": "0.0.1",
+  "dependencies": {
+    "express": "4.14.0",
+    "peerflix": "0.36.0",
+    "parse-torrent": "^5.4.0",
+    "body-parser": "1.15.2",
+    "numeral": "1.5.6"
+  }
+}
