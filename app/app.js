@@ -1,5 +1,4 @@
 const http = require('http');
-const formidable = require('formidable');
 const peerflix = require('peerflix');
 const child_process = require('child_process');
 const express = require('express');
