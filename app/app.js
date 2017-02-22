@@ -56,7 +56,7 @@ app.post('/start', (req, res) => {
             });
 
             engine.server.on('listening', () => {
-                const VLC_ARGS = '-q --video-on-top --play-and-exit';
+                const VLC_ARGS = '-q --video-on-top --play-and-exit --http-caching=30000';
                 const root = '/Applications/VLC.app/Contents/MacOS/VLC';
                 const home = (process.env.HOME || '') + root;
 
@@ -76,7 +76,6 @@ app.post('/start', (req, res) => {
 });
 
 app.get('/info', (req, res) => {
-    console.log('get');
     let swarm = engine && engine.swarm;
 
     res.json({
