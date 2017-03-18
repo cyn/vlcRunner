@@ -162,6 +162,9 @@ function start() {
             pump(file.createReadStream(range), res);
         });
 
+    expressApp
+            .get('/ping', (req, res) => res.status(200).end());
+
     expressApp.listen(PORT, () => console.log(`Start at ${PORT}`));
 }
 

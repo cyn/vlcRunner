@@ -13,7 +13,7 @@
   },
   "permissions": [
     "contextMenus",
-    "http://127.0.0.1/*"
+    "http://localhost/*"
   ],
   "icons": {
     "16": "vlc512x512.png",
