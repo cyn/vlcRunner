@@ -1,0 +1,11 @@
+.App {
+    font-family: Tahoma, sans-serif;
+    font-size: 12px;
+    margin: 2px;
+}
+
+.App__title
+{
+    font-size: 14px;
+    margin: 4px 0 6px;
+}
