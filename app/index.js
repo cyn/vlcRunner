@@ -40,12 +40,12 @@ function createMainWindow() {
         y: trayBounds.y
     });
 
-    // mainWindow.loadURL(url.format({
-    //     pathname: path.join(__dirname, 'build/index.html'),
-    //     protocol: 'file:',
-    // }));
-    mainWindow.loadURL('http://localhost:3000');
-    mainWindow.webContents.openDevTools();
+    mainWindow.loadURL(url.format({
+        pathname: path.join(__dirname, 'ui', 'build', 'index.html'),
+        protocol: 'file:',
+    }));
+    // mainWindow.loadURL('http://localhost:3000');
+    // mainWindow.webContents.openDevTools();
 }
 
 function start() {
