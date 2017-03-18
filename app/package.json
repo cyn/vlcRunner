@@ -29,8 +29,8 @@
     "ui-build": "cd ui && react-scripts build",
     "ui-start": "cd ui && react-scripts start",
     "ui-eject": "cd ui && react-scripts eject",
-    "pack": "build -m --dir",
-    "dist": "build -m"
+    "pack": "npm run ui-build && build -m --dir",
+    "dist": "npm run ui-build && build -m"
   },
   "devDependencies": {
     "react-devtools": "^2.0.12",
