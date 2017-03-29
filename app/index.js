@@ -13,15 +13,19 @@ const rangeParser = require('range-parser');
 const express = require('express');
 const bodyParser = require('body-parser');
 const parseTorrent = require('parse-torrent').remote;
-
-const getType = mime.lookup.bind(mime);
-
 const mainWindowParams = {
     width: 600,
     height: 400
 };
 
 const StreamList = require('./StreamList');
+
+const tryToAddStream = pathToTorrent => parseTorrent(pathToTorrent, (err, parsedTorrent) => {
+    if (!err) {
+        streamList.addItem(parsedTorrent);
+    }
+});
+
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -37,15 +41,25 @@ function createMainWindow() {
         width: mainWindowParams.width,
         height: mainWindowParams.height,
         x: trayBounds.x - mainWindowParams.width + trayBounds.width,
-        y: trayBounds.y
+        y: trayBounds.y,
+        fullscreenable: false,
+        minimizable: false,
+        maximizable: false,
+        movable: false,
+        alwaysOnTop: true,
+        frame: false
     });
 
-    mainWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'ui', 'build', 'index.html'),
-        protocol: 'file:',
-    }));
-    // mainWindow.loadURL('http://localhost:3000');
-    // mainWindow.webContents.openDevTools();
+    if (process.env.LOAD_UI_FROM_DEV_SERVER) {
+        mainWindow.loadURL('http://localhost:3000');
+        mainWindow.webContents.openDevTools();
+    } else {
+        mainWindow.loadURL(url.format({
+            pathname: path.join(__dirname, 'ui', 'build', 'index.html'),
+            protocol: 'file:',
+        }));
+    }
+
 }
 
 function start() {
@@ -60,21 +74,14 @@ function start() {
 
     expressApp.use(bodyParser.json());
 
+    /* START ручки для расширения */
+    expressApp.get('/ping', (req, res) => res.status(200).end());
     expressApp.post('/start', (req, res) => {
-        if (req.body.url) {
-            parseTorrent(req.body.url, (err, parsedTorrent) => {
-                if (err) {
-                    console.error(err);
-                }
-
-                console.log(parsedTorrent);
-
-                streamList.addItem(parsedTorrent);
-            });
-        }
+        tryToAddStream(req.body.url);
 
         res.send('ok');
     });
+    /* END ручки для расширения */
 
     expressApp
         .all('/stream/*', (req, res, next) => {
@@ -102,6 +109,7 @@ function start() {
             next();
         });
 
+    // Запрос плейлиста от VLC
     expressApp
         .get('/stream/:infoHash/playlist.m3u', (req, res, next) => {
             if (streamList.hasStreamExist(req.params.infoHash)) {
@@ -121,6 +129,7 @@ function start() {
             res.end(playlist);
         });
 
+    // Запрос потока от VLC
     expressApp
         .all('/stream/:infoHash', (req, res, next) => {
             if (streamList.hasStreamExist(req.params.infoHash)) {
@@ -137,6 +146,8 @@ function start() {
                 });
 
             range = range && rangeParser(file.length, range)[0];
+
+            req.connection.setTimeout(3600000);
 
             res.set({
                 'Accept-Ranges': 'bytes',
@@ -162,9 +173,6 @@ function start() {
             pump(file.createReadStream(range), res);
         });
 
-    expressApp
-            .get('/ping', (req, res) => res.status(200).end());
-
     expressApp.listen(PORT, () => console.log(`Start at ${PORT}`));
 }
 
@@ -172,38 +180,45 @@ function start() {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-    let timerId;
-
     start();
-
-    // app.dock.hide();
 
     tray = new Tray(path.join(__dirname, 'icons/vlc.png'));
 
     createMainWindow();
 
-    mainWindow.on('blur', e => {
-        mainWindow.hide();
-    });
+    let timerId,
+        webContents = mainWindow.webContents,
+        updateInfo = info => webContents.send('update-info', info);
 
     mainWindow.on('show', e => {
-        timerId = setInterval(() => {
-            mainWindow.webContents.send('update-info', streamList.getInfo())
-        }, 500)
+        timerId = setInterval(() => updateInfo(streamList.getInfo()), 500);
     });
+    mainWindow.on('hide', () => clearInterval(timerId));
+    mainWindow.on('blur', () => mainWindow.hide());
 
     ipcMain.on('play', (e, data) => streamList.play(data.infoHash));
     ipcMain.on('remove', (e, data) => streamList.remove(data.infoHash));
 
-    mainWindow.on('hide', e => {
-        clearInterval(timerId);
-    });
-
-    tray.on('click', (e) => {
+    tray.on('click', () => {
         if (mainWindow.isVisible()) {
             mainWindow.hide();
         } else {
             mainWindow.show();
         }
+    });
+
+    tray.on('drag-enter', (e, data) => {
+        if (!mainWindow.isVisible()) {
+            mainWindow.show();
+        }
+    });
+
+    tray.on('drop-files', (e, files) => {
+        files.forEach(filePath => tryToAddStream(filePath));
+    });
+
+    webContents.on('will-navigate', (e, url) => {
+        tryToAddStream(url);
+        e.preventDefault();
     });
 });

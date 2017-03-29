@@ -5,15 +5,19 @@ import './App.css';
 
 class App extends Component {
     render() {
+        let { props } = this,
+            items = props.data || [],
+            itemsCount = items.length;
+
         return <div className="App">
-            <div className="App__title">Список потоков:</div>
+            <div className="App__title">{itemsCount ? 'Список потоков:' : 'Список пуст'}</div>
             {
-                (this.props.data || []).map(item => {
+                items.map(item => {
                     let { hash } = item;
 
                     return <ListItem
-                        play={() => this.props.play(hash)}
-                        remove={() => this.props.remove(hash)}
+                        play={() => props.play(hash)}
+                        remove={() => props.remove(hash)}
                         key={hash}
                         {...item}
                     />;

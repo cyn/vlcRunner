@@ -10,18 +10,31 @@ class StreamItem extends EventEmitter {
         super();
 
         this._infoHash = parsedTorrent.infoHash;
-        this._torrentName = parsedTorrent.name;
+        this._torrentName = parsedTorrent.name || parsedTorrent.infoHash;
         this._engine = torrentStream(parsedTorrent);
         this._player = player;
         this._files = [];
 
+        this._piecesCount = (parsedTorrent.pieces || []).length;
+        this._verifiedPiecesCount = 0;
+
         this._engine.on('ready', () => this._onEngineReady());
+        this._engine.on('verify', () => this._onVerifyPiece());
     }
 
     _onEngineReady() {
-        let files = this._files = this._engine.files;
+        let { files, torrent } = this._engine,
+            { name, pieces } = torrent;
+
+        this._files = files;
+        this._torrentName = name;
+        this._piecesCount = pieces.length;
 
         this.play();
+    }
+
+    _onVerifyPiece() {
+        this._verifiedPiecesCount += 1;
     }
 
     play() {
@@ -48,7 +61,7 @@ class StreamItem extends EventEmitter {
             downloaded,
             uploaded,
             totalLength,
-            downloadedPercentage: Math.round(downloaded / totalLength * 100),
+            downloadedPercentage: Math.round(this._verifiedPiecesCount / this._piecesCount * 100),
             downloadSpeed: parseInt(swarm.downloadSpeed(), 10),
             uploadSpeed: parseInt(swarm.uploadSpeed(), 10),
             totalPeers: wires.length,
@@ -80,9 +93,8 @@ class StreamItem extends EventEmitter {
     destroy() {
         return Promise.all([
             this._player.close(this._infoHash),
-            new Promise(resolve => this._engine.destroy(() => {
-                resolve();
-            }))
+            new Promise(resolve => this._engine.remove(resolve)),
+            new Promise(resolve => this._engine.destroy(resolve)),
         ]);
     }
 
