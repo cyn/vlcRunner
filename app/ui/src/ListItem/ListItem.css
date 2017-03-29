@@ -1,0 +1,42 @@
+.ListItem
+{
+    padding: 10px;
+    margin: 5px 0;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.ListItem__name
+{
+    display: inline-block;
+    margin-right: 15px;
+}
+
+.ListItem__play
+{
+    display: inline-block;
+    margin-right: 15px;
+}
+
+.ListItem__speed
+{
+    display: inline-block;
+    margin-right: 15px;
+}
+
+.ListItem__size
+{
+    display: inline-block;
+    margin-right: 15px;
+}
+
+.ListItem__percentage
+{
+    display: inline-block;
+    margin-right: 15px;
+}
+
+.ListItem__remove
+{
+    display: inline-block;
+}
