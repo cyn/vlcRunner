@@ -3,16 +3,18 @@ const torrentStream = require('torrent-stream');
 const EventEmitter = require('events');
 const url = require('url');
 const path = require('path');
+const VLC = require('./VLC.js');
 
 class StreamItem extends EventEmitter {
 
-    constructor(parsedTorrent, player) {
+    constructor(parsedTorrent, autoPlay, hostPort) {
         super();
+
+        this._hostPort = hostPort;
 
         this._infoHash = parsedTorrent.infoHash;
         this._torrentName = parsedTorrent.name || parsedTorrent.infoHash;
         this._engine = torrentStream(parsedTorrent);
-        this._player = player;
         this._files = [];
 
         this._piecesCount = (parsedTorrent.pieces || []).length;
@@ -20,6 +22,10 @@ class StreamItem extends EventEmitter {
 
         this._engine.on('ready', () => this._onEngineReady());
         this._engine.on('verify', () => this._onVerifyPiece());
+
+        if (autoPlay) {
+            this._engine.on('ready', () => this.startVlc());
+        }
     }
 
     _onEngineReady() {
@@ -29,19 +35,29 @@ class StreamItem extends EventEmitter {
         this._files = files;
         this._torrentName = name;
         this._piecesCount = pieces.length;
-
-        this.play();
     }
 
     _onVerifyPiece() {
         this._verifiedPiecesCount += 1;
     }
 
-    play() {
-        this._player.play({
-            infoHash: this._infoHash,
-            autoPlay: true,
-            onExit: () => console.log('exit')
+    startVlc() {
+        VLC(/*{ onExit: () => console.log('exit') }*/).then(vlcInfo => this._onVlcInit(vlcInfo));
+    }
+
+    _onVlcInit({ vlc, kill }) {
+        let playlistUrl = this._getUrl({ partPath: 'playlist.m3u' });
+
+        this._vlc = vlc;
+        this._vlcKill = kill;
+
+        vlc.play(playlistUrl).then(() => {
+            vlc.on('change:position', (oldVal, newVal) => {
+                console.log(oldVal, newVal);
+            });
+            vlc.on('change:playlist', (oldVal, newVal) => {
+                console.log(newVal);
+            });
         });
     }
 
@@ -69,17 +85,13 @@ class StreamItem extends EventEmitter {
         };
     }
 
-    getPlaylist({ host, port }) {
+    getPlaylist() {
         let entries = this._files.map((file, fileIndex) => {
-            let fileName = file.name,
-                href = StreamItem.getFileUrl({
-                    host,
-                    port,
-                    fileIndex,
-                    infoHash: this._infoHash
-                });
+            let href = this._getUrl({
+                query: { fileIndex }
+            });
 
-            return `#EXTINF:-1,${fileName}\n${href}`;
+            return `#EXTINF:-1,${file.name}\n${href}`;
         }, this);
 
         return ['#EXTM3U'].concat(entries).join('\n');
@@ -90,31 +102,24 @@ class StreamItem extends EventEmitter {
             (this._totalLength = this._files.reduce((prevFileLength, currFile) => prevFileLength + currFile.length, 0));
     }
 
+    _getUrl({ partPath, query }) {
+        let { host, port } = this._hostPort;
+
+        return url.format({
+            protocol: 'http',
+            hostname: host,
+            port,
+            pathname: path.join.apply(path, ['stream', this._infoHash].concat(partPath || [])),
+            query: query
+        })
+    }
+
     destroy() {
         return Promise.all([
-            this._player.close(this._infoHash),
+            this._vlcKill(),
             new Promise(resolve => this._engine.remove(resolve)),
             new Promise(resolve => this._engine.destroy(resolve)),
         ]);
-    }
-
-    static getFileUrl({ host, port, infoHash, fileIndex }) {
-        return url.format({
-            protocol: 'http',
-            hostname: host,
-            port,
-            pathname: path.join('stream', infoHash),
-            query: { fileIndex }
-        });
-    }
-
-    static getPlaylistUrl({ host, port, infoHash }) {
-        return url.format({
-            protocol: 'http',
-            hostname: host,
-            port,
-            pathname: path.join('stream', infoHash, 'playlist.m3u')
-        });
     }
 
 }

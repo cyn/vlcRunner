@@ -1,5 +1,9 @@
-const PORT = 4545;
-const HOST = 'localhost';
+const HOST_PORT = {
+    host: 'localhost',
+    port: 4545
+};
+
+const StreamItem = require('./StreamItem');
 
 const { ipcMain, app, BrowserWindow, Tray, Menu } = require('electron');
 app.dock.hide();
@@ -18,20 +22,20 @@ const mainWindowParams = {
     height: 400
 };
 
-const StreamList = require('./StreamList');
+let streamList = new Map();
 
 const tryToAddStream = pathToTorrent => parseTorrent(pathToTorrent, (err, parsedTorrent) => {
     if (!err) {
-        streamList.addItem(parsedTorrent);
+        let { infoHash } = parsedTorrent;
+
+        streamList.set(infoHash, new StreamItem(parsedTorrent, true, HOST_PORT));
     }
 });
-
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
 let tray;
-let streamList;
 
 function createMainWindow() {
     let trayBounds = tray.getBounds();
@@ -63,14 +67,10 @@ function createMainWindow() {
 }
 
 function start() {
-    streamList = new StreamList({
-        host: HOST,
-        port: PORT
-    });
-
     // mainWindow.webContents.send('update-info', { info });
 
-    let expressApp = express();
+    let { host, port } = HOST_PORT,
+        expressApp = express();
 
     expressApp.use(bodyParser.json());
 
@@ -112,14 +112,14 @@ function start() {
     // Запрос плейлиста от VLC
     expressApp
         .get('/stream/:infoHash/playlist.m3u', (req, res, next) => {
-            if (streamList.hasStreamExist(req.params.infoHash)) {
+            if (streamList.has(req.params.infoHash)) {
                 next();
             } else {
                 res.status(404).end();
             }
         })
         .get('/stream/:infoHash/playlist.m3u', (req, res) => {
-            let playlist = streamList.getPlaylist(req.params.infoHash);
+            let playlist = streamList.get(req.params.infoHash).getPlaylist();
 
             res.set({
                 'Content-Type': 'application/x-mpegurl; charset=utf-8',
@@ -132,7 +132,7 @@ function start() {
     // Запрос потока от VLC
     expressApp
         .all('/stream/:infoHash', (req, res, next) => {
-            if (streamList.hasStreamExist(req.params.infoHash)) {
+            if (streamList.has(req.params.infoHash)) {
                 next();
             } else {
                 res.status(404).end();
@@ -140,10 +140,7 @@ function start() {
         })
         .all('/stream/:infoHash', (req, res) => {
             let range = req.headers.range,
-                file = streamList.getFileFromStream({
-                    infoHash: req.params.infoHash,
-                    fileIndex: req.query.fileIndex
-                });
+                file = streamList.get(req.params.infoHash).getFile(req.query.fileIndex);
 
             range = range && rangeParser(file.length, range)[0];
 
@@ -173,7 +170,7 @@ function start() {
             pump(file.createReadStream(range), res);
         });
 
-    expressApp.listen(PORT, () => console.log(`Start at ${PORT}`));
+    expressApp.listen(port, host, () => console.log(`Start at ${port}`));
 }
 
 // This method will be called when Electron has finished
@@ -182,7 +179,7 @@ function start() {
 app.on('ready', () => {
     start();
 
-    tray = new Tray(path.join(__dirname, 'icons/vlc.png'));
+    tray = new Tray(path.join(__dirname, 'icons/VLC.png'));
 
     createMainWindow();
 
@@ -191,13 +188,20 @@ app.on('ready', () => {
         updateInfo = info => webContents.send('update-info', info);
 
     mainWindow.on('show', e => {
-        timerId = setInterval(() => updateInfo(streamList.getInfo()), 500);
+        timerId = setInterval(() => {
+            let accInfo = [];
+
+            streamList.forEach(streamItem => accInfo.push(streamItem.getInfo()));
+
+            updateInfo(accInfo.reverse());
+        }, 500);
     });
     mainWindow.on('hide', () => clearInterval(timerId));
     mainWindow.on('blur', () => mainWindow.hide());
 
-    ipcMain.on('play', (e, data) => streamList.play(data.infoHash));
-    ipcMain.on('remove', (e, data) => streamList.remove(data.infoHash));
+    ipcMain.on('play', (e, data) => streamList.get(data.infoHash).startVlc());
+    ipcMain.on('remove', (e, data) => streamList.get(data.infoHash).destroy()
+        .then(() => streamList.delete(data.infoHash)));
 
     tray.on('click', () => {
         if (mainWindow.isVisible()) {
