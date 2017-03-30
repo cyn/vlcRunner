@@ -89,6 +89,22 @@ class VLCReRenode extends VLCRenode {
         return result;
     }
 
+    _req(params) {
+        let base = super._req(params);
+
+        return this._isReady ?
+            base :
+            base.then(
+                res => {
+                    this._isReady = true;
+                    this.emit('ready');
+
+                    return res;
+                },
+                () => {}
+            );
+    }
+
 }
 
 module.exports = VLCReRenode;

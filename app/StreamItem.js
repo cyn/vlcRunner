@@ -4,6 +4,7 @@ const EventEmitter = require('events');
 const url = require('url');
 const path = require('path');
 const VLC = require('./VLC.js');
+const randomPort = require('random-port');
 
 class StreamItem extends EventEmitter {
 
@@ -42,23 +43,27 @@ class StreamItem extends EventEmitter {
     }
 
     startVlc() {
-        VLC(/*{ onExit: () => console.log('exit') }*/).then(vlcInfo => this._onVlcInit(vlcInfo));
+        randomPort(port => {
+            let { vlc, kill } = VLC({/* onExit: () => console.log('exit'),*/ port });
+
+            this._vlc = vlc;
+            this._vlcKill = kill;
+
+            this._vlc.on('ready', () => this._onVlcReady())
+        });
     }
 
-    _onVlcInit({ vlc, kill }) {
+    _onVlcReady() {
         let playlistUrl = this._getUrl({ partPath: 'playlist.m3u' });
 
-        this._vlc = vlc;
-        this._vlcKill = kill;
-
-        vlc.play(playlistUrl).then(() => {
-            vlc.on('change:position', (oldVal, newVal) => {
-                console.log(oldVal, newVal);
-            });
-            vlc.on('change:playlist', (oldVal, newVal) => {
-                console.log(newVal);
-            });
+        this._vlc.on('change:position', (oldVal, newVal) => {
+            console.log(oldVal, newVal);
         });
+        this._vlc.on('change:playlist', (oldVal, newVal) => {
+            console.log(newVal);
+        });
+
+        this._vlc.play(playlistUrl);
     }
 
     getFile(index) {
