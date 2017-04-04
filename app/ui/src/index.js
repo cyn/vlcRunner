@@ -1,9 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import App from './App/App.js';
+import App from './App/App.jsx';
 import './index.css';
 
-const _ = require('lodash');
 const electron = window.require('electron');
 const fs = electron.remote.require('fs');
 const ipcRenderer = electron.ipcRenderer;
@@ -14,7 +13,7 @@ const play = infoHash => ipcRenderer.send('play', { infoHash });
 const remove = infoHash => ipcRenderer.send('remove', { infoHash });
 
 const mapStateToProps = (state) => {
-    _.extend(state, {
+    Object.assign(state, {
         play,
         remove
     });

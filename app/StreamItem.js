@@ -1,25 +1,33 @@
-const _ = require('lodash');
 const torrentStream = require('torrent-stream');
 const EventEmitter = require('events');
 const url = require('url');
 const path = require('path');
+const VLC = require('./VLC.js');
+const randomPort = require('random-port');
+const _ = require('lodash');
 
 class StreamItem extends EventEmitter {
 
-    constructor(parsedTorrent, player) {
+    constructor(parsedTorrent, autoPlay, port) {
         super();
+
+        this._port = port;
 
         this._infoHash = parsedTorrent.infoHash;
         this._torrentName = parsedTorrent.name || parsedTorrent.infoHash;
         this._engine = torrentStream(parsedTorrent);
-        this._player = player;
         this._files = [];
+        this._vlcState = {};
 
         this._piecesCount = (parsedTorrent.pieces || []).length;
         this._verifiedPiecesCount = 0;
 
         this._engine.on('ready', () => this._onEngineReady());
         this._engine.on('verify', () => this._onVerifyPiece());
+
+        if (autoPlay) {
+            this._engine.on('ready', () => this.startVlc());
+        }
     }
 
     _onEngineReady() {
@@ -29,20 +37,75 @@ class StreamItem extends EventEmitter {
         this._files = files;
         this._torrentName = name;
         this._piecesCount = pieces.length;
-
-        this.play();
     }
 
     _onVerifyPiece() {
         this._verifiedPiecesCount += 1;
     }
 
-    play() {
-        this._player.play({
-            infoHash: this._infoHash,
-            autoPlay: true,
-            onExit: () => console.log('exit')
+    startVlc() {
+        this._closeVlc().then(() => {
+            randomPort(port => {
+                this._vlc = VLC(port);
+
+                this._vlc.once('destruct', () => {
+                    this._vlc.removeAllListeners();
+                    this._vlc = null;
+                });
+
+                this._vlc.once('ready', () => this._onVlcReady());
+            });
         });
+    }
+
+    _onVlcReady() {
+        let playlistUri = this._getUrl({ partPath: 'playlist.m3u' }),
+            onChangePlayList = (oldVal, newVal) => {
+                let isPlaylistLoaded = newVal.length && _.get(newVal, '[0].uri') !== playlistUri;
+
+                if (isPlaylistLoaded) {
+                    this._vlc.removeListener('change:playlist', onChangePlayList);
+                    this._onVlcPlaylistReady(newVal);
+                }
+            };
+
+        this._vlc.on('change:playlist', onChangePlayList);
+        this._vlc.play(playlistUri);
+    }
+
+    _closeVlc() {
+        return this._vlc ?
+            new Promise(resolve => {
+                this._vlc.once('destruct', resolve);
+                this._vlc.kill();
+            }) :
+            Promise.resolve();
+    }
+
+    _onVlcPlaylistReady(playlist) {
+        let {
+            position,
+            playlistId = _.get(playlist, '[0].id', -1)
+        } = this._vlcState;
+
+        if (position) {
+            this._vlc.once('change:currentplid', () => this._vlc.seek(position));
+        }
+
+        this._vlc.goto(playlistId);
+
+        this._vlc.on('change:position', (oldVal, newVal) => this._changeVlcState({ position: newVal }));
+        this._vlc.on('change:currentplid', (oldVal, newVal) => this._changeVlcState({ playlistId: newVal }));
+    }
+
+    _changeVlcState({ position, playlistId }) {
+        if (!_.isUndefined(position) && position !== this._vlcState.position) {
+            this._vlcState.position = position;
+        }
+
+        if (!_.isUndefined(playlistId) && this._vlcState.playlistId !== playlistId) {
+            this._vlcState.playlistId = playlistId;
+        }
     }
 
     getFile(index) {
@@ -65,21 +128,18 @@ class StreamItem extends EventEmitter {
             downloadSpeed: parseInt(swarm.downloadSpeed(), 10),
             uploadSpeed: parseInt(swarm.uploadSpeed(), 10),
             totalPeers: wires.length,
-            activePeers: wires.filter(wire => !wire.peerChoking).length
+            activePeers: wires.filter(wire => !wire.peerChoking).length,
+            vlcState: this._vlcState
         };
     }
 
-    getPlaylist({ host, port }) {
+    getPlaylist() {
         let entries = this._files.map((file, fileIndex) => {
-            let fileName = file.name,
-                href = StreamItem.getFileUrl({
-                    host,
-                    port,
-                    fileIndex,
-                    infoHash: this._infoHash
-                });
+            let href = this._getUrl({
+                query: { fileIndex }
+            });
 
-            return `#EXTINF:-1,${fileName}\n${href}`;
+            return `#EXTINF:-1,${file.name}\n${href}`;
         }, this);
 
         return ['#EXTM3U'].concat(entries).join('\n');
@@ -90,33 +150,23 @@ class StreamItem extends EventEmitter {
             (this._totalLength = this._files.reduce((prevFileLength, currFile) => prevFileLength + currFile.length, 0));
     }
 
+    _getUrl({ partPath, query }) {
+        return url.format({
+            protocol: 'http',
+            hostname: 'localhost',
+            port: this._port,
+            pathname: path.join.apply(path, ['stream', this._infoHash].concat(partPath || [])),
+            query: query
+        })
+    }
+
     destroy() {
         return Promise.all([
-            this._player.close(this._infoHash),
+            this._closeVlc(),
             new Promise(resolve => this._engine.remove(resolve)),
             new Promise(resolve => this._engine.destroy(resolve)),
         ]);
     }
-
-    static getFileUrl({ host, port, infoHash, fileIndex }) {
-        return url.format({
-            protocol: 'http',
-            hostname: host,
-            port,
-            pathname: path.join('stream', infoHash),
-            query: { fileIndex }
-        });
-    }
-
-    static getPlaylistUrl({ host, port, infoHash }) {
-        return url.format({
-            protocol: 'http',
-            hostname: host,
-            port,
-            pathname: path.join('stream', infoHash, 'playlist.m3u')
-        });
-    }
-
 }
 
 module.exports = StreamItem;
