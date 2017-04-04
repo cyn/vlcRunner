@@ -8,10 +8,10 @@ const _ = require('lodash');
 
 class StreamItem extends EventEmitter {
 
-    constructor(parsedTorrent, autoPlay, hostPort) {
+    constructor(parsedTorrent, autoPlay, port) {
         super();
 
-        this._hostPort = hostPort;
+        this._port = port;
 
         this._infoHash = parsedTorrent.infoHash;
         this._torrentName = parsedTorrent.name || parsedTorrent.infoHash;
@@ -151,12 +151,10 @@ class StreamItem extends EventEmitter {
     }
 
     _getUrl({ partPath, query }) {
-        let { host, port } = this._hostPort;
-
         return url.format({
             protocol: 'http',
-            hostname: host,
-            port,
+            hostname: 'localhost',
+            port: this._port,
             pathname: path.join.apply(path, ['stream', this._infoHash].concat(partPath || [])),
             query: query
         })
@@ -169,7 +167,6 @@ class StreamItem extends EventEmitter {
             new Promise(resolve => this._engine.destroy(resolve)),
         ]);
     }
-
 }
 
 module.exports = StreamItem;
