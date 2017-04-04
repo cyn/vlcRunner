@@ -3,7 +3,7 @@ const VlcReRenode = require('./VlcReRenode');
 const treeKill = require('tree-kill');
 
 const vlcPath = '/Applications/VLC.app/Contents/MacOS/VLC';
-const HTTP_CACHING=30000;
+const NETWORK_CACHING=10000;
 const INTERVAL_VLC_POLLING = 500;
 
 let getVlc = (port) => {
@@ -16,10 +16,10 @@ let getVlc = (port) => {
         vlcArgs = [
             '--extraintf=http',
             `--http-password=${options.password}`,
-            `--http-caching=${HTTP_CACHING}`,
             `--http-port=${options.port}`,
-            '--video-on-top',
             '--http-reconnect',
+            `--network-caching=${NETWORK_CACHING}`,
+            '--video-on-top',
             '--no-playlist-autostart'
         ],
         vlcProc = spawn(vlcPath, vlcArgs, { stdio: 'ignore' }),
