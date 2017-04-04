@@ -17,10 +17,7 @@ const rangeParser = require('range-parser');
 const express = require('express');
 const bodyParser = require('body-parser');
 const parseTorrent = require('parse-torrent').remote;
-const mainWindowParams = {
-    width: 600,
-    height: 400
-};
+const mainWindowParams = { width: 600, height: 400 };
 
 let streamList = new Map();
 
@@ -56,7 +53,7 @@ function createMainWindow() {
 
     if (process.env.LOAD_UI_FROM_DEV_SERVER) {
         mainWindow.loadURL('http://localhost:3000');
-        mainWindow.webContents.openDevTools();
+        // mainWindow.webContents.openDevTools();
     } else {
         mainWindow.loadURL(url.format({
             pathname: path.join(__dirname, 'ui', 'build', 'index.html'),
@@ -73,6 +70,12 @@ function start() {
         expressApp = express();
 
     expressApp.use(bodyParser.json());
+    expressApp.use(function (req, res, next) {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'OPTIONS, POST, GET, PUT, DELETE');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        next();
+    });
 
     /* START ручки для расширения */
     expressApp.get('/ping', (req, res) => res.status(200).end());
@@ -82,32 +85,6 @@ function start() {
         res.send('ok');
     });
     /* END ручки для расширения */
-
-    expressApp
-        .all('/stream/*', (req, res, next) => {
-            // Allow CORS requests to specify arbitrary headers, e.g. 'Range',
-            // by responding to the OPTIONS preflight request with the specified
-            // origin and requested headers.
-            if (req.method === 'OPTIONS' && req.headers['access-control-request-headers']) {
-                res.set({
-                    'Access-Control-Allow-Origin': req.headers.origin,
-                    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-                    'Access-Control-Allow-Headers': req.headers['access-control-request-headers'],
-                    'Access-Control-Max-Age': '1728000'
-                });
-
-                res.end();
-            } else {
-                next();
-            }
-        })
-        .all('/stream/*', (req, res, next) => {
-            if (req.headers.origin) {
-                res.set('Access-Control-Allow-Origin', req.headers.origin);
-            }
-
-            next();
-        });
 
     // Запрос плейлиста от VLC
     expressApp
@@ -170,7 +147,7 @@ function start() {
             pump(file.createReadStream(range), res);
         });
 
-    expressApp.listen(port, host, () => console.log(`Start at ${port}`));
+    expressApp.listen(port, host);
 }
 
 // This method will be called when Electron has finished

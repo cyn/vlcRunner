@@ -1,9 +1,27 @@
 .ListItem
 {
+    position: relative;
     padding: 10px;
     margin: 5px 0;
     background: rgba(0, 0, 0, 0.1);
     border-radius: 3px;
+}
+
+.ListItem__pos
+{
+    position: absolute;
+    left: 0;
+    top: 0;
+    content: '';
+    height: 100%;
+    background: rgba(0, 0, 255, 0.05);
+    box-shadow: inset 0 0 5px 1px rgba(0, 0, 255, 0.05);
+    border-radius: inherit;
+}
+
+.ListItem__wrap
+{
+    position: relative;
 }
 
 .ListItem__name

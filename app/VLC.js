@@ -1,15 +1,13 @@
 const { spawn } = require('child_process');
 const VlcReRenode = require('./VlcReRenode');
-const random_port = require('random-port');
 const treeKill = require('tree-kill');
 
 const vlcPath = '/Applications/VLC.app/Contents/MacOS/VLC';
 const HTTP_CACHING=30000;
 const INTERVAL_VLC_POLLING = 500;
 
-let getVlc = (params) => {
-    let { port, onExit } = params || {},
-        options = {
+let getVlc = (port) => {
+    let options = {
             password: 'secret',
             host: 'localhost',
             port,
@@ -21,24 +19,18 @@ let getVlc = (params) => {
             `--http-caching=${HTTP_CACHING}`,
             `--http-port=${options.port}`,
             '--video-on-top',
-            '--http-reconnect'
+            '--http-reconnect',
+            '--no-playlist-autostart'
         ],
-        proc = spawn(vlcPath, vlcArgs, {stdio: 'ignore'}),
+        vlcProc = spawn(vlcPath, vlcArgs, { stdio: 'ignore' }),
+        { pid } = vlcProc,
         vlc = new VlcReRenode(options);
 
-    onExit && proc.on('exit', onExit);
+    vlc.kill = () => pid && treeKill(pid, 'SIGKILL');
 
-    return {
-        vlc,
-        kill: () => new Promise(resolve => {
-            let {pid} = proc;
+    vlcProc.on('exit', () => vlc.disconnect());
 
-            pid && treeKill(pid, 'SIGKILL', () => {
-                resolve();
-            });
-        })
-
-    };
+    return vlc;
 };
 
 module.exports = getVlc;

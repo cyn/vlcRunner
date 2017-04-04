@@ -1,10 +1,10 @@
-const _ = require('lodash');
 const torrentStream = require('torrent-stream');
 const EventEmitter = require('events');
 const url = require('url');
 const path = require('path');
 const VLC = require('./VLC.js');
 const randomPort = require('random-port');
+const _ = require('lodash');
 
 class StreamItem extends EventEmitter {
 
@@ -17,6 +17,7 @@ class StreamItem extends EventEmitter {
         this._torrentName = parsedTorrent.name || parsedTorrent.infoHash;
         this._engine = torrentStream(parsedTorrent);
         this._files = [];
+        this._vlcState = {};
 
         this._piecesCount = (parsedTorrent.pieces || []).length;
         this._verifiedPiecesCount = 0;
@@ -43,27 +44,68 @@ class StreamItem extends EventEmitter {
     }
 
     startVlc() {
-        randomPort(port => {
-            let { vlc, kill } = VLC({/* onExit: () => console.log('exit'),*/ port });
+        this._closeVlc().then(() => {
+            randomPort(port => {
+                this._vlc = VLC(port);
 
-            this._vlc = vlc;
-            this._vlcKill = kill;
+                this._vlc.once('destruct', () => {
+                    this._vlc.removeAllListeners();
+                    this._vlc = null;
+                });
 
-            this._vlc.on('ready', () => this._onVlcReady())
+                this._vlc.once('ready', () => this._onVlcReady());
+            });
         });
     }
 
     _onVlcReady() {
-        let playlistUrl = this._getUrl({ partPath: 'playlist.m3u' });
+        let playlistUri = this._getUrl({ partPath: 'playlist.m3u' }),
+            onChangePlayList = (oldVal, newVal) => {
+                let isPlaylistLoaded = newVal.length && _.get(newVal, '[0].uri') !== playlistUri;
 
-        this._vlc.on('change:position', (oldVal, newVal) => {
-            console.log(oldVal, newVal);
-        });
-        this._vlc.on('change:playlist', (oldVal, newVal) => {
-            console.log(newVal);
-        });
+                if (isPlaylistLoaded) {
+                    this._vlc.removeListener('change:playlist', onChangePlayList);
+                    this._onVlcPlaylistReady(newVal);
+                }
+            };
 
-        this._vlc.play(playlistUrl);
+        this._vlc.on('change:playlist', onChangePlayList);
+        this._vlc.play(playlistUri);
+    }
+
+    _closeVlc() {
+        return this._vlc ?
+            new Promise(resolve => {
+                this._vlc.once('destruct', resolve);
+                this._vlc.kill();
+            }) :
+            Promise.resolve();
+    }
+
+    _onVlcPlaylistReady(playlist) {
+        let {
+            position,
+            playlistId = _.get(playlist, '[0].id', -1)
+        } = this._vlcState;
+
+        if (position) {
+            this._vlc.once('change:currentplid', () => this._vlc.seek(position));
+        }
+
+        this._vlc.goto(playlistId);
+
+        this._vlc.on('change:position', (oldVal, newVal) => this._changeVlcState({ position: newVal }));
+        this._vlc.on('change:currentplid', (oldVal, newVal) => this._changeVlcState({ playlistId: newVal }));
+    }
+
+    _changeVlcState({ position, playlistId }) {
+        if (!_.isUndefined(position) && position !== this._vlcState.position) {
+            this._vlcState.position = position;
+        }
+
+        if (!_.isUndefined(playlistId) && this._vlcState.playlistId !== playlistId) {
+            this._vlcState.playlistId = playlistId;
+        }
     }
 
     getFile(index) {
@@ -86,7 +128,8 @@ class StreamItem extends EventEmitter {
             downloadSpeed: parseInt(swarm.downloadSpeed(), 10),
             uploadSpeed: parseInt(swarm.uploadSpeed(), 10),
             totalPeers: wires.length,
-            activePeers: wires.filter(wire => !wire.peerChoking).length
+            activePeers: wires.filter(wire => !wire.peerChoking).length,
+            vlcState: this._vlcState
         };
     }
 
@@ -121,7 +164,7 @@ class StreamItem extends EventEmitter {
 
     destroy() {
         return Promise.all([
-            this._vlcKill(),
+            this._closeVlc(),
             new Promise(resolve => this._engine.remove(resolve)),
             new Promise(resolve => this._engine.destroy(resolve)),
         ]);

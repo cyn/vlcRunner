@@ -10,6 +10,13 @@ class VLCReRenode extends VLCRenode {
         });
     }
 
+    goto(id) {
+        return this._req({
+            command: 'pl_play',
+            id: id
+        });
+    }
+
     _reqPlaylist() {
         if (!this._optionsPlaylist) {
             this._optionsPlaylist = {
@@ -25,41 +32,11 @@ class VLCReRenode extends VLCRenode {
         });
     }
 
-    connect() {
-        super.connect();
-
-        this.connectToPlaylist()
-    }
-
-    connectToPlaylist() {
-        this._intervalPlaylist = setInterval(() => {
-            this._reqPlaylist()
-                .then(
-                    body => this._onGettingPlaylistBody(body),
-                    e => this._onGettingPlaylistBodyError(e)
-                );
-        }, this._intervalMilSecs);
-    }
-
-
-    disconnect() {
-        super.disconnect();
-
-        this.disconnectFromPlaylist();
-    }
-
-    disconnectFromPlaylist() {
-        clearInterval(this._intervalPlaylist);
-    }
-
     _onGettingPlaylistBody(body) {
         if (this._cachedLastBody !== body) {
             let formattedPlaylist = this._formatPlaylist(JSON.parse(body));
 
-            this.emit('change:playlist', {
-                oldVal: this._cachedPlaylist,
-                newVal: formattedPlaylist
-            });
+            this.emit('change:playlist', this._cachedPlaylist, formattedPlaylist);
 
             this._cachedLastBody = body;
             this._cachedPlaylist = formattedPlaylist;
@@ -67,8 +44,6 @@ class VLCReRenode extends VLCRenode {
     }
 
     _onGettingPlaylistBodyError(error) {
-        this.disconnectFromPlaylist();
-
         this.emit('error:playlist', { error });
     }
 
@@ -89,7 +64,16 @@ class VLCReRenode extends VLCRenode {
         return result;
     }
 
+    getPlaylist() {
+        return this._cachedPlaylist;
+    }
+
     _req(params) {
+        this._reqPlaylist().then(
+            body => this._onGettingPlaylistBody(body),
+            e => this._onGettingPlaylistBodyError(e)
+        );
+
         let base = super._req(params);
 
         return this._isReady ?
@@ -103,6 +87,11 @@ class VLCReRenode extends VLCRenode {
                 },
                 () => {}
             );
+    }
+
+    disconnect() {
+        super.disconnect();
+        this.emit('destruct');
     }
 
 }
