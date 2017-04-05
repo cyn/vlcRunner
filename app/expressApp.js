@@ -55,7 +55,7 @@ module.exports = (streamList, addToStreamList, port) => {
         })
         .all('/stream/:infoHash', (req, res) => {
             let range = req.headers.range,
-                file = streamList.get(req.params.infoHash).getFile(req.query.fileIndex);
+                file = streamList.get(req.params.infoHash).getFile(req.query.index);
 
             range = range && rangeParser(file.length, range)[0];
 

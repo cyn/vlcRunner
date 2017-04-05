@@ -5,6 +5,7 @@ const path = require('path');
 const VLC = require('./VLC.js');
 const randomPort = require('random-port');
 const _ = require('lodash');
+const mime = require('mime');
 
 class StreamItem extends EventEmitter {
 
@@ -134,13 +135,16 @@ class StreamItem extends EventEmitter {
     }
 
     getPlaylist() {
-        let entries = this._files.map((file, fileIndex) => {
-            let href = this._getUrl({
-                query: { fileIndex }
-            });
+        let getUrl = this._getUrl.bind(this),
+            entries = this._files.reduce((res, { name }, index) => {
+                if (/^video\/.*/.test(mime.lookup(name))) {
+                    let href = getUrl({ query: { index } });
 
-            return `#EXTINF:-1,${file.name}\n${href}`;
-        }, this);
+                    res.push(`#EXTINF:-1,${name}\n${href}`);
+                }
+
+                return res;
+            }, []);
 
         return ['#EXTM3U'].concat(entries).join('\n');
     }
