@@ -31,8 +31,9 @@
     "ui-build": "cd ui && react-scripts build",
     "ui-start": "cd ui && react-scripts start",
     "ui-eject": "cd ui && react-scripts eject",
-    "pack": "npm run ui-build && build -m --dir",
-    "dist": "npm run ui-build && build -m"
+    "chrome-ext-pack": "cd extensions && node chrome.js",
+    "pack": "npm run ui-build && npm run chrome-ext-pack && build -m --dir",
+    "dist": "npm run ui-build && npm run chrome-ext-pack && build -m"
   },
   "devDependencies": {
     "electron": "1.6.1",

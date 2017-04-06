@@ -5,9 +5,9 @@ const devToolsHeight = 275;
 const url = require('url');
 const path = require('path');
 
-// if (!isDev) {
-//     app.dock.hide();
-// }
+if (!isDev) {
+    app.dock.hide();
+}
 
 module.exports = {
     create: tray => {
