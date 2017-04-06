@@ -9,7 +9,7 @@ const mime = require('mime');
 
 class StreamItem extends EventEmitter {
 
-    constructor(parsedTorrent, autoPlay, port) {
+    constructor({ parsedTorrent, vlcState, autoPlay, port }) {
         super();
 
         this._port = port;
@@ -18,7 +18,7 @@ class StreamItem extends EventEmitter {
         this._torrentName = parsedTorrent.name || parsedTorrent.infoHash;
         this._engine = torrentStream(parsedTorrent);
         this._files = [];
-        this._vlcState = {};
+        this._vlcState = vlcState || {};
 
         this._piecesCount = (parsedTorrent.pieces || []).length;
         this._verifiedPiecesCount = 0;
@@ -170,6 +170,14 @@ class StreamItem extends EventEmitter {
             new Promise(resolve => this._engine.remove(resolve)),
             new Promise(resolve => this._engine.destroy(resolve)),
         ]);
+    }
+
+    get vlcState() {
+        return this._vlcState;
+    }
+
+    get infoHash() {
+        return this._infoHash
     }
 }
 

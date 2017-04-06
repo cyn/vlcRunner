@@ -81,7 +81,7 @@ class VLCReRenode extends VLCRenode {
             base.then(
                 res => {
                     this._isReady = true;
-                    this.emit('ready');
+                        this.emit('ready');
 
                     return res;
                 },

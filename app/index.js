@@ -5,14 +5,27 @@ const StreamItem = require('./StreamItem');
 const windowManager = require('./windowManager');
 const expressApp = require('./expressApp');
 const trayManager = require('./trayManager');
+const stateStorage = require('./stateStorage');
 
 const PORT = 4545;
 
 app.on('ready', () => {
-    let streamList = new Map(),
-        addToStreamList = (torrent) => {
+    let state = stateStorage.load(),
+        streamList = new Map(),
+        addToStreamList = (torrent, autoPlay = true) => {
             parseTorrent(torrent, (err, parsedTorrent) => {
-                err || streamList.set(parsedTorrent.infoHash, new StreamItem(parsedTorrent, true, PORT));
+                if (!err) {
+                    let { infoHash } = parsedTorrent;
+
+                    streamList.set(infoHash, new StreamItem({
+                        parsedTorrent,
+                        vlcState: state.vlc.get(infoHash),
+                        autoPlay,
+                        port: PORT
+                    }));
+
+                    state.torrents.has(infoHash) || state.torrents.set(infoHash, torrent);
+                }
             });
         },
         tray = trayManager.create(),
@@ -25,6 +38,8 @@ app.on('ready', () => {
 
             mainWindow.webContents.send('update-info', accInfo.reverse());
         };
+
+    state.torrents.forEach((torrent) => addToStreamList(torrent, false));
 
     expressApp(streamList, addToStreamList, PORT);
     trayManager.init(mainWindow, addToStreamList);
@@ -43,9 +58,23 @@ app.on('ready', () => {
 
     ipcMain.on('remove', (e, { infoHash }) => {
         if (streamList.has(infoHash)) {
-            streamList.get(infoHash).destroy().then(() => streamList.delete(infoHash))
+            streamList.get(infoHash).destroy().then(() => {
+                streamList.delete(infoHash);
+                state.torrents.delete(infoHash);
+                state.vlc.delete(infoHash);
+            });
         }
     });
+
+    app.on('before-quit', () => {
+        streamList.forEach(streamItem => {
+            if (streamItem.vlcState) {
+                state.vlc.set(streamItem.infoHash, streamItem.vlcState);
+            }
+        });
+
+        stateStorage.save(state);
+    })
 });
 
 
