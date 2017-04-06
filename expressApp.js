@@ -3,6 +3,8 @@ const rangeParser = require('range-parser');
 const bodyParser = require('body-parser');
 const pump = require('pump');
 const mime = require('mime');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = (streamList, addToStreamList, port) => {
     let expressApp = express();
@@ -23,6 +25,10 @@ module.exports = (streamList, addToStreamList, port) => {
         res.send('ok');
     });
     /* END ручки для расширения */
+
+    expressApp.get('/chrome.crx', (req, res, next) => {
+        res.sendFile(path.join(__dirname, 'extensions', 'chrome.crx'));
+    });
 
     // Запрос плейлиста от VLC
     expressApp
