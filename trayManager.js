@@ -1,5 +1,7 @@
 const { app, Menu, shell, Tray } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const packageJson = JSON.parse(fs.readFileSync('./package.json'));
 
 let trayInstance;
 
@@ -10,11 +12,10 @@ module.exports = {
     init: (mainWindow, addToStreamList) => {
         const contextMenu = Menu.buildFromTemplate([
             {
-                label: 'Скачать расширение для Google Chrome',
-                click() {
-                    shell.openExternal('http://localhost:4545/chrome.crx');
-                }
+                label: `${packageJson.name}@${packageJson.version}`,
+                enabled: false
             },
+            { type: 'separator' },
             {
                 label: 'Справка',
                 click() {
@@ -22,10 +23,15 @@ module.exports = {
                 }
             },
             {
-                label: 'Выход',
+                label: 'Расширение для Google Chrome',
                 click() {
-                    app.quit();
+                    shell.openExternal('http://localhost:4545/chrome.crx');
                 }
+            },
+            {
+                label: 'Выход',
+                accelerator: 'Cmd+Q',
+                role: 'quit'
             }
         ]);
 
