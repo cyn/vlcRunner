@@ -19,7 +19,7 @@ module.exports = {
             {
                 label: 'О программе',
                 click() {
-                    shell.openExternal(`https://github.com/cyn/vlcRunner/blob/v${version}/README.md`);
+                    shell.openExternal(`https://github.com/cyn/vlcRunner/blob/master/README.md`);
                 }
 
             },
