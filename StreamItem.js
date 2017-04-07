@@ -6,10 +6,11 @@ const VLC = require('./VLC.js');
 const randomPort = require('random-port');
 const _ = require('lodash');
 const mime = require('mime');
+const isVideo = fileName => /^video\/.*/.test(mime.lookup(fileName));
 
 class StreamItem extends EventEmitter {
 
-    constructor({ parsedTorrent, vlcState, autoPlay, port }) {
+    constructor({ parsedTorrent, state, autoPlay, port }) {
         super();
 
         this._port = port;
@@ -18,7 +19,8 @@ class StreamItem extends EventEmitter {
         this._torrentName = parsedTorrent.name || parsedTorrent.infoHash;
         this._engine = torrentStream(parsedTorrent);
         this._files = [];
-        this._vlcState = vlcState || {};
+        this._state = state || {};
+        this._playlistIds = [];
 
         this._piecesCount = (parsedTorrent.pieces || []).length;
         this._verifiedPiecesCount = 0;
@@ -84,10 +86,12 @@ class StreamItem extends EventEmitter {
     }
 
     _onVlcPlaylistReady(playlist) {
+        this._playlistIds = playlist.map(({ id }) => id);
+
         let {
             position,
-            playlistId = _.get(playlist, '[0].id', -1)
-        } = this._vlcState;
+            playlistId = this._playlistIds[0]
+        } = this._state;
 
         if (position) {
             this._vlc.once('change:currentplid', () => this._vlc.seek(position));
@@ -95,17 +99,17 @@ class StreamItem extends EventEmitter {
 
         this._vlc.goto(playlistId);
 
-        this._vlc.on('change:position', (oldVal, newVal) => this._changeVlcState({ position: newVal }));
-        this._vlc.on('change:currentplid', (oldVal, newVal) => this._changeVlcState({ playlistId: newVal }));
+        this._vlc.on('change:position', (oldVal, newVal) => this._changeState({ position: newVal }));
+        this._vlc.on('change:currentplid', (oldVal, newVal) => this._changeState({ playlistId: newVal }));
     }
 
-    _changeVlcState({ position, playlistId }) {
-        if (!_.isUndefined(position) && position !== this._vlcState.position) {
-            this._vlcState.position = position;
+    _changeState({ position, playlistId }) {
+        if (!_.isUndefined(position) && position !== this._state.position) {
+            this._state.position = position;
         }
 
-        if (!_.isUndefined(playlistId) && this._vlcState.playlistId !== playlistId) {
-            this._vlcState.playlistId = playlistId;
+        if (!_.isUndefined(playlistId) && this._state.playlistId !== playlistId) {
+            this._state.playlistId = playlistId;
         }
     }
 
@@ -115,43 +119,70 @@ class StreamItem extends EventEmitter {
 
     getInfo() {
         let { swarm } = this._engine;
-        let { downloaded, uploaded, wires } = swarm;
-        let totalLength = this._getTotalLength();
+        let { totalLength, weightFiles } = this._getVideoFilesInfo(),
+            currentPositionAtFile = _.get(this._state, 'position', 0),
+            currentPlaylistId = _.get(this._state, 'playlistId', -1),
+            currentFileIndex = _.get(this._fileIndexesInPlaylist, this._playlistIds.indexOf(currentPlaylistId), 0),
+            weightCurrentFile = _.get(weightFiles, currentFileIndex, 0);
 
         return {
             hash: this._infoHash,
             name: this._torrentName,
-            files: this._files.map(file => _.pick(file, ['name', 'length'])),
-            downloaded,
-            uploaded,
             totalLength,
-            downloadedPercentage: Math.round(this._verifiedPiecesCount / this._piecesCount * 100),
+            downloaded: this._verifiedPiecesCount / this._piecesCount,
             downloadSpeed: parseInt(swarm.downloadSpeed(), 10),
-            uploadSpeed: parseInt(swarm.uploadSpeed(), 10),
-            totalPeers: wires.length,
-            activePeers: wires.filter(wire => !wire.peerChoking).length,
-            vlcState: this._vlcState
+            vlcTotalPosition: weightCurrentFile * currentPositionAtFile
         };
     }
 
     getPlaylist() {
         let getUrl = this._getUrl.bind(this),
-            entries = this._files.reduce((res, { name }, index) => {
-                if (/^video\/.*/.test(mime.lookup(name))) {
-                    let href = getUrl({ query: { index } });
+            fileIndexesInPlaylist = [],
+            entries = this._files
+                .reduce((res, { name }, index) => res.concat(
+                    isVideo(name) ?
+                        {
+                            name,
+                            index,
+                            entry: `#EXTINF:-1,${name}\n${getUrl({ query: { index } })}`
+                        } :
+                        []
+                ), [])
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(a => {
+                    fileIndexesInPlaylist.push(a.index);
 
-                    res.push(`#EXTINF:-1,${name}\n${href}`);
-                }
+                    return a.entry;
+                });
 
-                return res;
-            }, []);
+        this._fileIndexesInPlaylist = fileIndexesInPlaylist;
 
         return ['#EXTM3U'].concat(entries).join('\n');
     }
 
-    _getTotalLength() {
-        return this._totalLength ||
-            (this._totalLength = this._files.reduce((prevFileLength, currFile) => prevFileLength + currFile.length, 0));
+    _getVideoFilesInfo() {
+         if (!this._totalLength || this._weightFiles) {
+             let videoFilesSize = {};
+
+             let totalLength = this._totalLength = this._files.reduce((prevFilesLength, { length }, fileIndex) => {
+                 videoFilesSize[fileIndex] = length;
+
+                 return prevFilesLength + length;
+             }, 0);
+
+             this._weightFiles = Object.keys(videoFilesSize).reduce((res, fileIndex) => {
+                 let fileLength = videoFilesSize[fileIndex];
+
+                 res[fileIndex] = fileLength / totalLength;
+
+                 return res;
+             }, {});
+         }
+
+        return {
+            totalLength: this._totalLength,
+            weightFiles: this._weightFiles
+        };
     }
 
     _getUrl({ partPath, query }) {
@@ -172,8 +203,8 @@ class StreamItem extends EventEmitter {
         ]);
     }
 
-    get vlcState() {
-        return this._vlcState;
+    get state() {
+        return this._state;
     }
 
     get infoHash() {

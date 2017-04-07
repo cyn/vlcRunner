@@ -1,7 +1,7 @@
-const { app, Menu, shell, Tray } = require('electron');
+const { Menu, shell, Tray } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const packageJson = JSON.parse(fs.readFileSync('./package.json'));
+const { name, version } = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json')));
 
 let trayInstance;
 
@@ -12,15 +12,16 @@ module.exports = {
     init: (mainWindow, addToStreamList) => {
         const contextMenu = Menu.buildFromTemplate([
             {
-                label: `${packageJson.name}@${packageJson.version}`,
+                label: `${name} v${version}`,
                 enabled: false
             },
             { type: 'separator' },
             {
-                label: 'Справка',
+                label: 'О программе',
                 click() {
-                    shell.openExternal('https://github.com/cyn/vlcRunner');
+                    shell.openExternal(`https://github.com/cyn/vlcRunner/blob/v${version}/README.md`);
                 }
+
             },
             {
                 label: 'Расширение для Google Chrome',
@@ -29,7 +30,7 @@ module.exports = {
                 }
             },
             {
-                label: 'Выход',
+                label: 'Закрыть',
                 accelerator: 'Cmd+Q',
                 role: 'quit'
             }

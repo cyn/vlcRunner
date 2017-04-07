@@ -14,26 +14,26 @@ const store = new Store({
     defaults: {
         state: {
             torrents: '[]',
-            vlc: '[]'
+            streams: '[]'
         }
     }
 });
 
 module.exports = {
 
-    save({ torrents = new Map(), vlc = new Map() }) {
+    save({ torrents = new Map(), streams = new Map() }) {
         store.set('state', {
             torrents: mapToJson(torrents),
-            vlc: mapToJson(vlc)
+            streams: mapToJson(streams)
         })
     },
 
     load() {
-        let { torrents, vlc } = store.get('state');
+        let { torrents, streams } = store.get('state');
 
         return {
             torrents: jsonToMap(torrents),
-            vlc: jsonToMap(vlc)
+            streams: jsonToMap(streams)
         };
     }
 

@@ -19,7 +19,7 @@ app.on('ready', () => {
 
                     streamList.set(infoHash, new StreamItem({
                         parsedTorrent,
-                        vlcState: state.vlc.get(infoHash),
+                        state: state.streams.get(infoHash),
                         autoPlay,
                         port: PORT
                     }));
@@ -61,15 +61,15 @@ app.on('ready', () => {
             streamList.get(infoHash).destroy().then(() => {
                 streamList.delete(infoHash);
                 state.torrents.delete(infoHash);
-                state.vlc.delete(infoHash);
+                state.streams.delete(infoHash);
             });
         }
     });
 
     app.on('before-quit', () => {
         streamList.forEach(streamItem => {
-            if (streamItem.vlcState) {
-                state.vlc.set(streamItem.infoHash, streamItem.vlcState);
+            if (streamItem.state) {
+                state.streams.set(streamItem.infoHash, streamItem.state);
             }
         });
 
