@@ -1,5 +1,5 @@
 {
-  "name": "VLC runner",
+  "name": "VLC-runner",
   "description": "the app allows you to start streaming videos in vlc directly from your browser",
   "version": "0.0.5",
   "homepage": "./",

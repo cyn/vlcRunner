@@ -23,12 +23,16 @@ class ListItem extends Component {
             <div className="ListItem">
                 <div className="ListItem__pos" style={{ width:`${viewedFormated}%` }}></div>
                 <div className="ListItem__wrap">
-                    <a className="ListItem__play" href="#" onClick={play}>play</a>
+                    <a className="ListItem__play" href="#" onClick={play}>
+                        <div className="ListItem__icon"/>
+                    </a>
                     <div className="ListItem__name">{name}</div>
                     <div className="ListItem__size">{bytes(totalLength)}</div>
                     <div className="ListItem__speed">{bytes(downloadSpeed)}/s</div>
                     <div className="ListItem__percentage">{downloadedFormated}%</div>
-                    <a className="ListItem__remove" href="#" onClick={remove}>remove</a>
+                    <a className="ListItem__remove" href="#" onClick={remove}>
+                        <div className="ListItem__icon"/>
+                    </a>
                 </div>
             </div>
         );
