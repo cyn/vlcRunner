@@ -2,26 +2,21 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import App from './App/App.jsx';
 import './index.css';
-
-const electron = window.require('electron');
-const fs = electron.remote.require('fs');
-const ipcRenderer = electron.ipcRenderer;
+const { ipcRenderer } = window.require('electron');
+const { version } = require('../../package.json');
 
 const rootEl = document.getElementById('root');
 
-const play = infoHash => ipcRenderer.send('play', { infoHash });
-const remove = infoHash => ipcRenderer.send('remove', { infoHash });
-
-const mapStateToProps = (state) => {
-    Object.assign(state, {
-        play,
-        remove
-    });
-    return state;
-};
+const onPlay = infoHash => ipcRenderer.send('play', { infoHash });
+const onRemove = infoHash => ipcRenderer.send('remove', { infoHash });
 
 const render = (data) => ReactDOM.render(
-    React.createElement(App, mapStateToProps({ data })),
+    React.createElement(App, {
+        version,
+        data,
+        onPlay,
+        onRemove
+    }),
     rootEl
 );
 
