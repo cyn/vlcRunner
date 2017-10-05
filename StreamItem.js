@@ -124,7 +124,9 @@ class StreamItem extends EventEmitter {
     }
 
     getInfo() {
-        let { swarm } = this._engine;
+        let { swarm } = this._engine,
+            totalPeers = swarm.wires,
+            activePeers = totalPeers.filter(peer => !peer.peerChoking);
 
         return {
             hash: this._infoHash,
@@ -132,7 +134,9 @@ class StreamItem extends EventEmitter {
             totalLength: this._totalLength,
             downloaded: this._verifiedPiecesCount / this._piecesCount,
             downloadSpeed: parseInt(swarm.downloadSpeed(), 10),
-            vlcTotalPosition: this._getCurrentProgress()
+            vlcTotalPosition: this._getCurrentProgress(),
+            totalPeers: totalPeers.length,
+            activePeers: activePeers.length
         };
     }
 

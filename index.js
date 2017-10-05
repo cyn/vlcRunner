@@ -66,6 +66,12 @@ app.on('ready', () => {
         }
     });
 
+    ipcMain.on('refresh', (e, { infoHash }) => {
+        if (state.torrents.has(infoHash)) {
+            addToStreamList(state.torrents.get(infoHash), false)
+        }
+    });
+
     app.on('before-quit', () => {
         streamList.forEach(streamItem => {
             if (streamItem.state) {

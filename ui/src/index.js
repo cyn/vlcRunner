@@ -9,13 +9,15 @@ const rootEl = document.getElementById('root');
 
 const onPlay = infoHash => ipcRenderer.send('play', { infoHash });
 const onRemove = infoHash => ipcRenderer.send('remove', { infoHash });
+const onRefresh = infoHash => ipcRenderer.send('refresh', { infoHash });
 
 const render = (data) => ReactDOM.render(
     React.createElement(App, {
         version,
         data,
         onPlay,
-        onRemove
+        onRemove,
+        onRefresh
     }),
     rootEl
 );

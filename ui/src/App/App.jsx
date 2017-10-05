@@ -31,6 +31,7 @@ class App extends Component {
                 return <ListItem
                     onPlay={() => props.onPlay(hash)}
                     onRemove={() => props.onRemove(hash)}
+                    onRefresh={() => props.onRefresh(hash)}
                     key={hash}
                     {...item}
                 />;

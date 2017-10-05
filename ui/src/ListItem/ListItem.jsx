@@ -13,7 +13,10 @@ class ListItem extends Component {
                 totalLength,
                 vlcTotalPosition,
                 onPlay,
-                onRemove
+                onRemove,
+                onRefresh,
+                totalPeers,
+                activePeers
             } = this.props,
             viewedFormated = (vlcTotalPosition * 100).toFixed(2),
             downloadedFormated = (downloaded * 100).toFixed(0);
@@ -26,9 +29,13 @@ class ListItem extends Component {
                         <div className="ListItem__icon"/>
                     </a>
                     <div className="ListItem__name">{name}</div>
+                    <div className="ListItem__peers">{activePeers}/{totalPeers}</div>
                     <div className="ListItem__size">{bytes(totalLength)}</div>
                     <div className="ListItem__speed">{bytes(downloadSpeed)}/s</div>
                     <div className="ListItem__percentage">{downloadedFormated}%</div>
+                    <a className="ListItem__refresh" href="#" onClick={onRefresh}>
+                        <div className="ListItem__icon"/>
+                    </a>
                     <a className="ListItem__remove" href="#" onClick={onRemove}>
                         <div className="ListItem__icon"/>
                     </a>
